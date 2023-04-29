@@ -894,7 +894,7 @@ final class NetFileSystemProvider extends AbstractFileSystemProvider
         {
             // null check
             type.getClass();
-            return type == BasicFileAttributeView.class || type == DosFileAttributeView.class;
+            return type == BasicFileAttributeView.class || type == DosFileAttributeView.class || type == FileOwnerAttributeView.class;
         }
 
         public boolean supportsFileAttributeView(String name)
@@ -1317,6 +1317,65 @@ final class NetFileSystemProvider extends AbstractFileSystemProvider
         }
     }
 
+    private static class FileOwnerAttributeViewImpl implements FileOwnerAttributeView, DynamicFileAttributeView
+    {
+        private static final String OWNER_NAME = "owner";
+
+        private UserPrincipal owner = new UserPrincipalImpl();
+
+        FileOwnerAttributeViewImpl(String path) {
+
+        }
+
+        @Override
+        public String name() {
+            return "owner";
+        }
+
+        @Override
+        public void setAttribute(String attribute, Object value)
+            throws IOException
+        {
+            if (attribute.equals(OWNER_NAME)) {
+                setOwner((UserPrincipal)value);
+            } else {
+                throw new IllegalArgumentException("'" + name() + ":" +
+                    attribute + "' not recognized");
+            }
+        }
+
+        @Override
+        public Map<String,Object> readAttributes(String[] attributes) throws IOException {
+            Map<String,Object> result = new HashMap<>();
+            for (String attribute: attributes) {
+                if (attribute.equals("*") || attribute.equals(OWNER_NAME)) {
+                    result.put(OWNER_NAME, getOwner());
+                } else {
+                    throw new IllegalArgumentException("'" + name() + ":" +
+                        attribute + "' not recognized");
+                }
+            }
+            return result;
+        }
+
+        @Override
+        public UserPrincipal getOwner() throws IOException {
+            return owner;
+        }
+
+        @Override
+        public void setOwner(UserPrincipal owner)
+            throws IOException
+        {
+            this.owner = owner;            
+        }
+    }
+
+    private static class UserPrincipalImpl implements UserPrincipal {
+        @Override
+        public String getName() { return "user"; }
+    }
+
     private static void validateLinkOption(LinkOption... options)
     {
         for (LinkOption option : options)
@@ -1345,6 +1404,10 @@ final class NetFileSystemProvider extends AbstractFileSystemProvider
         else if (type == DosFileAttributeView.class)
         {
             return (V)new DosFileAttributesViewImpl(npath);
+        }
+        else if (type == FileOwnerAttributeView.class)
+        {
+            return (V)new FileOwnerAttributeViewImpl(npath);
         }
         else
         {
